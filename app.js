@@ -17,6 +17,12 @@ app.use(cors({
 
 app.use(express.json());
 
+app.get('/', (req, res) => {
+    res.send("Interacting with safiri platform")
+})
+
+// app.post('/', )
+
 
 sequelize.sync({ alter: true }).then(() => {
     app.listen(process.env.PORT, () => {
