@@ -8,18 +8,19 @@ const africaStalking = africaStalkingData({
     username: 'sandbox',
 })
 
-const USSD_ABI = [
-    "function updateUSSD() external",
-    "function getPresentUSSD() external view returns(uint256)"
+const ERC20_ABI = [
+    "function transferFrom(address sender, address recipient, uint256 amount) external returns (bool)",
+    "function transfer(address recipient, uint256 amount) external returns (bool)",
+    "function allowance(address owner, address spender) external view returns (uint256)",
+    "function approve(address spender, uint256 amount) external returns (bool)",
+    "function balanceOf(address account) external view returns (uint256)",
 ];
 
-const ethProvider = new ethers.JsonRpcProvider(process.env.ETH_PROVIDER_URL);
-const contractAddress = "0xC7192fd5f0CB5283496EdEB0b5E4304BBc63bC32";
+const provider = process.env.ETH_PROVIDER_URL;
+const ethProvider = new ethers.JsonRpcProvider(provider);
+const tokenAddress = process.env.CONTRACT_ADDRESS;
 
-const privateKey = process.env.PRIVATE_KEY;
 
-const userWallet = new ethers.Wallet(privateKey, ethProvider);
-const ussdContract = new ethers.Contract(contractAddress, USSD_ABI, userWallet);
 
 
 
@@ -37,6 +38,24 @@ exports.ussdAccess = async (req, res) => {
 
     if(text == '1') {
         response = 'CON Enter fullname ';
+    }
+
+    if(text == '2') {
+        try {
+            const userExist = await User.findOne({ where: { phoneNumber } });
+
+            const tokenContract = await new ethers.Contract(tokenAddress, ERC20_ABI, ethProvider);
+            const userAddress = userExist.walletAddress;
+
+            const userBalance = await tokenContract.balanceOf(userAddress);
+
+            response = `END Your account balance is ${userBalance} safiri`
+
+            console.log("This is the safiri token balance", response);
+
+        } catch (error) {
+            response = 'END could not check balance at the moment'
+        }
     }
 
     if(text !== '') {
