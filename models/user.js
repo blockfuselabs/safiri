@@ -24,12 +24,6 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true
     },
     fullName: DataTypes.STRING,
-    //.... safiri username....//
-    safiriUsername: {
-      type: DataTypes.STRING,
-      unique: true, //...Ensure no duplicates//
-      allowNull: false
-    },
     email: DataTypes.STRING,
     password: DataTypes.STRING,
     walletAddress: DataTypes.STRING,

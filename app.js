@@ -3,25 +3,22 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
+const africasTalking = require('./services/integrateAfricasTalking');
 
 
 const app = express();
 
-app.options('*', cors());
-
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
 app.use(express.json());
+app.use(cors())
+app.use(express.json())
+app.use(express.urlencoded({extended: true}))
+
 
 app.get('/', (req, res) => {
     res.send("Interacting with safiri platform")
-})
+});
 
-// app.post('/', )
+app.post('/', africasTalking.ussdAccess);
 
 
 sequelize.sync({ alter: true }).then(() => {
