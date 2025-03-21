@@ -69,6 +69,30 @@ async function checkBalance(provider, address) {
         return 0n;
     }
 }
+//====generating safiri user logic start from here===//
+function sanitizeName(name) {
+    return name
+        .normalize('NFD') // Normalize accented characters
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^a-zA-Z]/g, '') // Remove non-alphabetic characters
+        .toLowerCase();
+}
+
+async function generateSafiriUsername(fullName, phoneNumber) {
+    let cleanName = sanitizeName(fullName);
+    let baseUsername = `${cleanName}.strk.safiri`;
+    
+    let username = baseUsername;
+    let counter = 1;
+
+    while (await User.findOne({ where: { safiriUsername: username } })) {
+        username = `${cleanName}${counter}.strk.safiri`;
+        counter++;
+    }
+
+    return username;
+}
+
 
 async function createAndDeployAccount(fullName, phoneNumber, passcode) {
     try {
@@ -102,14 +126,22 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
         console.log('Precalculated Address:', contractAddress);
         
       
-        const user = await User.create({
-            fullName,
-            phoneNumber,
-            walletAddress: contractAddress,
-            privateKey,
-            pin: passcode,
-            status: false
-        });
+// const safiriUsername = generateSafiriUsername(fullName, phoneNumber);
+// const safiriUsername = await generateSafiriUsername(fullName, phoneNumber);
+
+
+const safiriUsername = await generateSafiriUsername(fullName, phoneNumber);  // ✅ FIXED
+
+const user = await User.create({
+    fullName,
+    phoneNumber,
+    safiriUsername,
+    walletAddress: contractAddress,
+    privateKey,
+    pin: passcode,
+    status: false
+});
+
         
         console.log('User record created in database');
         
