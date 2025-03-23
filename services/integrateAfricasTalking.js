@@ -23,7 +23,7 @@ const africaStalking = africaStalkingData({
 });
 
 // Configuration
-const NODE_URL = process.env.STARKNET_NODE_URL || 'https://free-rpc.nethermind.io/sepolia-juno/v0_7';
+const NODE_URL = process.env.STARKNET_PROVIDER_URL || 'https://free-rpc.nethermind.io/sepolia-juno/v0_7';
 const TRANSACTION_VERSION = '0x3';
 
 // Argent X account class hash
@@ -58,8 +58,8 @@ async function checkBalance(provider, address) {
                 calldata: [address]
             });
             
-            if (response && response.result && response.result.length > 0) {
-                return BigInt(response.result[0]);
+            if (response && response.length > 0) {
+                return BigInt(response[0]);
             }
             
             throw new Error('Could not retrieve balance through any method');
@@ -67,6 +67,53 @@ async function checkBalance(provider, address) {
     } catch (error) {
         console.warn('Could not check balance:', error.message);
         return 0n;
+    }
+}
+
+async function transferTokens(senderAddress, privateKey, recipientAddress, amount) {
+    try {
+        console.log(`Initiating transfer of ${amount} STRK from ${senderAddress} to ${recipientAddress}`);
+        
+        const senderAccount = new Account(provider, senderAddress, privateKey);
+        
+        const senderBalance = await checkBalance(provider, senderAddress);
+        console.log(`Sender balance: ${senderBalance} wei (${Number(senderBalance) / 1e18} STRK)`);
+        
+        const amountInWei = BigInt(Math.floor(parseFloat(amount) * 1e18)).toString();
+        
+        if (BigInt(senderBalance) < BigInt(amountInWei)) {
+            return {
+                success: false,
+                message: "Insufficient balance for transfer"
+            };
+        }
+        
+        const transferCall = {
+            contractAddress: STRK_CONTRACT,
+            entrypoint: 'transfer',
+            calldata: [recipientAddress, amountInWei, 0]
+        };
+        
+        const { transaction_hash: transferTxHash } = await senderAccount.execute(transferCall, undefined, {
+            maxFee: '100000000000000',
+            version: TRANSACTION_VERSION
+        });
+        
+        console.log("Transfer transaction hash:", transferTxHash);
+        
+        await provider.waitForTransaction(transferTxHash);
+        
+        return {
+            success: true,
+            message: "Transfer completed successfully",
+            txHash: transferTxHash
+        };
+    } catch (error) {
+        console.error("Transfer error:", error);
+        return {
+            success: false,
+            message: error.message || "Failed to complete transfer"
+        };
     }
 }
 
@@ -242,7 +289,7 @@ exports.ussdAccess = async (req, res) => {
     let passcode = '';
     
     if(text == ''){
-        response = 'CON Welcome to Starknet Wallet \n 1. Create an account \n 2. Check wallet balance'
+        response = 'CON Welcome to Starknet Wallet \n 1. Create an account \n 2. Check wallet balance \n 3. Transfer'
     }
 
     else if(text == '1') {
@@ -276,24 +323,39 @@ exports.ussdAccess = async (req, res) => {
             
             if (!userExist) {
                 response = 'END You do not have an account. Please create one';
+            } else if (!userExist.status) {
+                response = 'END Your wallet is not yet active. Please wait for deployment.';
             } else {
-                const address = userExist.walletAddress;
-                const shortAddress = `${address.substring(0, 8)}...${address.substring(address.length - 6)}`;
-                response = `END Your wallet address:\n${shortAddress}\n\nStatus: ${userExist.status ? 'Active' : 'Pending'}`;
+                response = 'CON Enter amount to transfer (STRK)';
             }
         } catch (error) {
-            console.error("Address retrieval error:", error);
-            response = 'END Could not retrieve your wallet address';
+            console.error("Transfer initiation error:", error);
+            response = 'END Could not initiate transfer';
         }
     }
 
     else if(text !== '') {
         let array = text.split('*')
+        console.log(parseInt(array[0]) == 3);
+        
+        /*if(array[0] == '3') {
+        	response = `END Amount is ${array[1]}`
+        }*/
 
         if(array.length === 2) {
             if(parseInt(array[0]) == 1) {
                 fullName = array[1]
                 response = 'CON Enter your passcode'
+            }
+        }
+        
+        if(parseInt(array[0]) == 3) {
+            const amount = array[1];
+            
+            if (isNaN(amount) || parseFloat(amount) <= 0) {
+                response = 'END Please enter a valid amount';
+            } else {
+                response = 'CON Enter recipient wallet address';
             }
         }
 
@@ -336,8 +398,65 @@ exports.ussdAccess = async (req, res) => {
                 } catch (error) {
                     response = `END Error: ${error.message || "Unknown error"}`;
                 }
-            } 
-        } 
+            } else if(parseInt(array[0]) == 3) {
+                const amount = array[1];
+                const recipientAddress = array[2];
+                
+                if (!recipientAddress.startsWith('0x') || recipientAddress.length !== 66) {
+                    response = 'END Please enter a valid Starknet wallet address';
+                } else {
+                    response = 'CON Enter your PIN to confirm transfer';
+                }
+            }
+        }
+
+        if(array.length === 4) {
+            if(parseInt(array[0]) == 3) {
+                const amount = array[1];
+                const recipientAddress = array[2];
+                const userPin = array[3];
+                
+                try {
+                    const user = await User.findOne({ where: { phoneNumber } });
+                    
+                    if (!user) {
+                        response = 'END You do not have an account';
+                    } else if (user.pin != userPin) {
+                        response = 'END Incorrect PIN';
+                    } else {
+                        response = 'END Transfer initiated. You will receive an SMS confirmation.';
+                        
+                        transferTokens(user.walletAddress, user.privateKey, recipientAddress, amount)
+                            .then(async (result) => {
+                                let message;
+                                if (result.success) {
+                                    message = `Transfer of ${amount} STRK to ${recipientAddress.substring(0, 8)}...${recipientAddress.substring(recipientAddress.length - 6)} completed successfully.`;
+                                } else {
+                                    message = `Transfer failed: ${result.message}`;
+                                }
+                                
+                                console.log(result, message);
+                                
+                                // We can send SMS to the user when the transaction is successful or not
+                                /*try {
+                                    await africaStalking.SMS.send({
+                                        to: phoneNumber,
+                                        message
+                                    });
+                                } catch (smsError) {
+                                    console.error("SMS sending error", smsError);
+                                }*/
+                            })
+                            .catch(error => {
+                                console.error("Transfer execution error", error);
+                            });
+                    }
+                } catch (error) {
+                    console.error("Transfer processing error:", error);
+                    response = 'END Could not process transfer';
+                }
+            }
+        }
     } 
 
     res.set('Content-Type', 'text/plain');
