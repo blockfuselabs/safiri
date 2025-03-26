@@ -23,11 +23,12 @@ module.exports = (sequelize, DataTypes) => {
       autoIncrement: true,
       primaryKey: true
     },
-    safiriUsername: {
-      type: DataTypes.STRING,
-      unique: true,
-      allowNull: false
-  },
+    safiriUsername: DataTypes.STRING,
+  //   safiriUsername: {
+  //     type: DataTypes.STRING,
+  //     unique: true,
+  //     allowNull: false
+  // },
   
     fullName: DataTypes.STRING,
     phoneNumber: DataTypes.STRING,

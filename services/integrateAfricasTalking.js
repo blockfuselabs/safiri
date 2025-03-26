@@ -16,6 +16,7 @@ const {
     CairoCustomEnum
 } = require('starknet');
 const fs = require('fs');
+const { v4: uuid } = require('uuid');
 
 const africaStalking = africaStalkingData({
     apiKey: process.env.AFRICA_STALKING_API_KEY || "",
@@ -78,18 +79,19 @@ function sanitizeName(name) {
         .toLowerCase();
 }
 
-async function generateSafiriUsername(fullName, phoneNumber) {
-    let cleanName = sanitizeName(fullName);
-    let baseUsername = `${cleanName}.strk.safiri`;
+async function generateSafiriUsername(fullName) {
+    let formatedName = sanitizeName(fullName);
+    let username = `${formatedName}.strk.safiri`;
     
-    let username = baseUsername;
-    let counter = 1;
-
-    while (await User.findOne({ where: { safiriUsername: username } })) {
-        username = `${cleanName}${counter}.strk.safiri`;
-        counter++;
+    const existingUser = await User.findOne({ 
+        where: { safiriUsername: username },
+        attributes: ['safiriUsername'] 
+    });
+    
+    if (existingUser) {
+        return `${formatedName + uuid().slice(0,4)}.safiri`;
     }
-
+    
     return username;
 }
 
