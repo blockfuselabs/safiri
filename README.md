@@ -39,3 +39,11 @@ Financial inclusion remains a significant challenge in many regions, especially 
 3. **Ensuring continuous availability of USSD services.**  
 
 Safiri aims to **democratize blockchain access via USSD** while simplifying international fiat transactions. By leveraging **smart contracts** and **financial partnerships**, we provide a **scalable and secure solution** for seamless payments and crypto-to-fiat conversions.
+## Running the Safiri Project
+**rerequisites**
+- Ensure you have the following installed on your system<br>
+**Docker**<br>
+**Docker Compose (if not included with Docker)**<br>
+**Latest version of node**
+
+
