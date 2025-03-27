@@ -81,7 +81,7 @@ function sanitizeName(name) {
 
 async function generateSafiriUsername(fullName) {
     let formatedName = sanitizeName(fullName);
-    let username = `${formatedName}.strk.safiri`;
+    let username = `${formatedName}.safiri`;
     
     const existingUser = await User.findOne({ 
         where: { safiriUsername: username },
@@ -132,7 +132,7 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
 // const safiriUsername = await generateSafiriUsername(fullName, phoneNumber);
 
 
-const safiriUsername = await generateSafiriUsername(fullName, phoneNumber);  // ✅ FIXED
+const safiriUsername = await generateSafiriUsername(fullName);  // ✅ FIXED
 
 const user = await User.create({
     fullName,
