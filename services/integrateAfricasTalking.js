@@ -17,7 +17,6 @@ const {
     CairoCustomEnum
 } = require('starknet');
 const fs = require('fs');
-const { v4: uuid } = require('uuid');
 
 const africaStalking = africaStalkingData({
     apiKey: process.env.AFRICA_STALKING_API_KEY || "",
@@ -71,31 +70,6 @@ async function checkBalance(provider, address) {
         return 0n;
     }
 }
-//====generating safiri user logic start from here===//
-function sanitizeName(name) {
-    return name
-        .normalize('NFD') // Normalize accented characters
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .replace(/[^a-zA-Z]/g, '') // Remove non-alphabetic characters
-        .toLowerCase();
-}
-
-async function generateSafiriUsername(fullName) {
-    let formatedName = sanitizeName(fullName);
-    let username = `${formatedName}.safiri`;
-    
-    const existingUser = await User.findOne({ 
-        where: { safiriUsername: username },
-        attributes: ['safiriUsername'] 
-    });
-    
-    if (existingUser) {
-        return `${formatedName + uuid().slice(0,4)}.safiri`;
-    }
-    
-    return username;
-}
-
 
 async function transferTokens(senderAddress, privateKey, recipientAddress, amount) {
     try {
@@ -176,22 +150,14 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
         console.log('Precalculated Address:', contractAddress);
         
       
-// const safiriUsername = generateSafiriUsername(fullName, phoneNumber);
-// const safiriUsername = await generateSafiriUsername(fullName, phoneNumber);
-
-
-const safiriUsername = await generateSafiriUsername(fullName);  // ✅ FIXED
-
-const user = await User.create({
-    fullName,
-    phoneNumber,
-    safiriUsername,
-    walletAddress: contractAddress,
-    privateKey,
-    pin: passcode,
-    status: false
-});
-
+        const user = await User.create({
+            fullName,
+            phoneNumber,
+            walletAddress: contractAddress,
+            privateKey,
+            pin: passcode,
+            status: false
+        });
         
         console.log('User record created in database');
         
@@ -369,9 +335,70 @@ exports.ussdAccess = async (req, res) => {
         }
     }
 
+    // More complex logics
     else if(text !== '') {
-        let array = text.split('*')
         
+        let array = text.split('*')
+
+        if(array.length < 1) {
+            response = 'END Invalid input';
+        }
+        
+        // Create account option
+        if(parseInt(array[0]) == 1){
+            console.log(`Registration Array 1: ${array}`)
+            if(array.length === 2) {
+                if(parseInt(array[0]) == 1) {
+                    fullName = array[1]
+                    response = 'CON Enter your passcode'
+                }
+            }
+            
+            if(array.length === 3) {
+                console.log(`Registration Array 2: ${array}`)
+                if(parseInt(array[0]) == 1) {
+                    fullName = array[1]
+                    passcode = array[2]
+
+                    if(!fullName || !phoneNumber || !passcode) {
+                        response = 'END Incomplete signup details'
+                    }
+
+                    try {
+                        const userExist = await User.findOne({ where: { phoneNumber } });
+                    
+                        console.log("existence of user", userExist)
+                    
+                        if (userExist) {
+                            response = "END You already have an account"; 
+                        } else {
+                            response = 'END Creating account, you will receive an SMS when complete';
+                            createAndDeployAccount(fullName, phoneNumber, passcode).then(async (result) => {
+                                console.log("Account creation result:", result);
+                    
+                                if (result.success){
+                                    try {
+                                        await africaStalking.SMS.send({
+                                            to: phoneNumber,
+                                            message: `Your Starknet wallet has been created. Your wallet address: ${result.address.substring(0, 8)}...${result.address.substring(result.address.length - 6)}`
+                                        });
+                                    } catch (smsError) {
+                                        console.error("SMS sending error", smsError);
+                                    }
+                                }
+                            })
+                            .catch(error => {
+                                console.error("Account creation error", error);
+                            });
+                        }
+                    } catch (error) {
+                        response = `END Error: ${error.message || "Unknown error"}`;
+                    }
+                } 
+            }
+        }
+
+        // Transfer option
         if(parseInt(array[0]) == 3) {
             if(array.length === 2) {
                 const recipientIdentifier = array[1];
@@ -398,8 +425,12 @@ exports.ussdAccess = async (req, res) => {
                     response = 'END Could not find recipient';
                 }
             }
+
             
             if(array.length === 3) {
+                
+                console.log(`TF Amount Array: ${array}`)
+
                 const recipientIdentifier = array[1];
                 const amount = array[2];
                 
@@ -477,7 +508,7 @@ exports.ussdAccess = async (req, res) => {
                 }
             }
         }
-    } 
+    }
 
     res.set('Content-Type', 'text/plain');
     res.send(response);
