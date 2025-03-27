@@ -1,6 +1,7 @@
 require("dotenv").config();
 const africaStalkingData = require("africastalking");
-const { User } = require('../models');
+const { User, Transaction } = require('../models');
+const { Op } = require('sequelize');
 const { 
     Provider, 
     Account, 
@@ -24,7 +25,7 @@ const africaStalking = africaStalkingData({
 });
 
 // Configuration
-const NODE_URL = process.env.STARKNET_NODE_URL || 'https://free-rpc.nethermind.io/sepolia-juno/v0_7';
+const NODE_URL = process.env.STARKNET_PROVIDER_URL || 'https://free-rpc.nethermind.io/sepolia-juno/v0_7';
 const TRANSACTION_VERSION = '0x3';
 
 // Argent X account class hash
@@ -59,8 +60,8 @@ async function checkBalance(provider, address) {
                 calldata: [address]
             });
             
-            if (response && response.result && response.result.length > 0) {
-                return BigInt(response.result[0]);
+            if (response && response.length > 0) {
+                return BigInt(response[0]);
             }
             
             throw new Error('Could not retrieve balance through any method');
@@ -95,6 +96,53 @@ async function generateSafiriUsername(fullName) {
     return username;
 }
 
+
+async function transferTokens(senderAddress, privateKey, recipientAddress, amount) {
+    try {
+        console.log(`Initiating transfer of ${amount} STRK from ${senderAddress} to ${recipientAddress}`);
+        
+        const senderAccount = new Account(provider, senderAddress, privateKey);
+        
+        const senderBalance = await checkBalance(provider, senderAddress);
+        console.log(`Sender balance: ${senderBalance} wei (${Number(senderBalance) / 1e18} STRK)`);
+        
+        const amountInWei = BigInt(Math.floor(parseFloat(amount) * 1e18)).toString();
+        
+        if (BigInt(senderBalance) < BigInt(amountInWei)) {
+            return {
+                success: false,
+                message: "Insufficient balance for transfer"
+            };
+        }
+        
+        const transferCall = {
+            contractAddress: STRK_CONTRACT,
+            entrypoint: 'transfer',
+            calldata: [recipientAddress, amountInWei, 0]
+        };
+        
+        const { transaction_hash: transferTxHash } = await senderAccount.execute(transferCall, undefined, {
+            maxFee: '100000000000000',
+            version: TRANSACTION_VERSION
+        });
+        
+        console.log("Transfer transaction hash:", transferTxHash);
+        
+        await provider.waitForTransaction(transferTxHash);
+        
+        return {
+            success: true,
+            message: "Transfer completed successfully",
+            txHash: transferTxHash
+        };
+    } catch (error) {
+        console.error("Transfer error:", error);
+        return {
+            success: false,
+            message: error.message || "Failed to complete transfer"
+        };
+    }
+}
 
 async function createAndDeployAccount(fullName, phoneNumber, passcode) {
     try {
@@ -276,7 +324,7 @@ exports.ussdAccess = async (req, res) => {
     let passcode = '';
     
     if(text == ''){
-        response = 'CON Welcome to Starknet Wallet \n 1. Create an account \n 2. Check wallet balance'
+        response = 'CON Welcome to Starknet Wallet \n 1. Create an account \n 2. Check wallet balance \n 3. Transfer'
     }
 
     else if(text == '1') {
@@ -310,68 +358,125 @@ exports.ussdAccess = async (req, res) => {
             
             if (!userExist) {
                 response = 'END You do not have an account. Please create one';
+            } else if (!userExist.status) {
+                response = 'END Your wallet is not yet active. Please wait for deployment.';
             } else {
-                const address = userExist.walletAddress;
-                const shortAddress = `${address.substring(0, 8)}...${address.substring(address.length - 6)}`;
-                response = `END Your wallet address:\n${shortAddress}\n\nStatus: ${userExist.status ? 'Active' : 'Pending'}`;
+                response = 'CON Enter recipient username or phone number';
             }
         } catch (error) {
-            console.error("Address retrieval error:", error);
-            response = 'END Could not retrieve your wallet address';
+            console.error("Transfer initiation error:", error);
+            response = 'END Could not initiate transfer';
         }
     }
 
     else if(text !== '') {
         let array = text.split('*')
-
-        if(array.length === 2) {
-            if(parseInt(array[0]) == 1) {
-                fullName = array[1]
-                response = 'CON Enter your passcode'
-            }
-        }
-
-        if(array.length === 3) {
-            if(parseInt(array[0]) == 1) {
-                fullName = array[1]
-                passcode = array[2]
-
-                if(!fullName || !phoneNumber || !passcode) {
-                    response = 'END Incomplete signup details'
-                }
-
+        
+        if(parseInt(array[0]) == 3) {
+            if(array.length === 2) {
+                const recipientIdentifier = array[1];
+                
                 try {
-                    const userExist = await User.findOne({ where: { phoneNumber } });
-                
-                    console.log("existence of user", userExist)
-                
-                    if (userExist) {
-                        response = "END You already have an account"; 
+                    const recipient = await User.findOne({
+                        where: {
+                            [Op.or]: [
+                                { safiriUsername: recipientIdentifier },
+                                { phoneNumber: recipientIdentifier }
+                            ],
+                            status: true
+                        }
+                    });
+
+                    if (!recipient) {
+                        response = 'END Recipient not found or wallet not active';
                     } else {
-                        response = 'END Creating account, you will receive an SMS when complete';
-                        createAndDeployAccount(fullName, phoneNumber, passcode).then(async (result) => {
-                            console.log("Account creation result:", result);
+                        console.log('Recipient found:', recipient);
+                        response = 'CON Enter amount to transfer (STRK) to ' + recipient.fullName;
+                    }
+                } catch (error) {
+                    console.error("Recipient lookup error:", error);
+                    response = 'END Could not find recipient';
+                }
+            }
+            
+            if(array.length === 3) {
+                const recipientIdentifier = array[1];
+                const amount = array[2];
                 
-                            if (result.success){
-                                try {
+                if (isNaN(amount) || parseFloat(amount) <= 0) {
+                    response = 'END Please enter a valid amount';
+                } else {
+                    response = 'CON Enter your PIN to confirm transfer';
+                }
+            }
+            
+            if(array.length === 4) {
+                const recipientIdentifier = array[1];
+                const amount = array[2];
+                const userPin = array[3];
+                
+                try {
+                    const sender = await User.findOne({ where: { phoneNumber } });
+                    
+                    const recipient = await User.findOne({
+                        where: {
+                            [Op.or]: [
+                                { safiriUsername: recipientIdentifier },
+                                { phoneNumber: recipientIdentifier }
+                            ],
+                            status: true
+                        }
+                    });
+                    
+                    if (!sender) {
+                        response = 'END You do not have an account';
+                    } else if (sender.pin != userPin) {
+                        response = 'END Incorrect PIN';
+                    } else if (!recipient) {
+                        response = 'END Recipient not found or wallet not active';
+                    } else if (sender.phoneNumber === recipient.phoneNumber) {
+                        response = 'END You cannot transfer to your own account';
+                    } else {
+                        response = 'END Transfer initiated. You will receive an SMS confirmation.';
+                        
+                        transferTokens(sender.walletAddress, sender.privateKey, recipient.walletAddress, amount)
+                            .then(async (result) => {
+                                let message;
+                                if (result.success) {
+                                    await Transaction.create({
+                                        user_id: sender.id,
+                                        txHash: result.txHash,
+                                        amount: parseFloat(amount),
+                                        serviceBeneficiary: recipient.safiriUsername || recipient.phoneNumber,
+                                        date: new Date()
+                                    });
+                                    message = `Transfer of ${amount} STRK to ${recipient.safiriUsername || recipient.phoneNumber} completed successfully.`;
+                                } else {
+                                    message = `Transfer failed: ${result.message}`;
+                                }
+                                
+                                console.log(result, message);
+                                
+                                // We can send SMS to the user when the transaction is successful or not
+                                /*try {
                                     await africaStalking.SMS.send({
                                         to: phoneNumber,
-                                        message: `Your Starknet wallet has been created. Your wallet address: ${result.address.substring(0, 8)}...${result.address.substring(result.address.length - 6)}`
+                                        message
                                     });
                                 } catch (smsError) {
                                     console.error("SMS sending error", smsError);
-                                }
-                            }
-                        })
-                        .catch(error => {
-                            console.error("Account creation error", error);
-                        });
+                                }*/
+                            })
+                            .catch(error => {
+                                console.error("Transfer execution error", error);
+                            });
                     }
                 } catch (error) {
-                    response = `END Error: ${error.message || "Unknown error"}`;
+                    console.error("Transfer processing error:", error);
+                    response = 'END Could not process transfer';
                 }
-            } 
-        } 
+            }
+        }
     } 
 
     res.set('Content-Type', 'text/plain');
