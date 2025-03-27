@@ -346,8 +346,16 @@ exports.ussdAccess = async (req, res) => {
         
         // Create account option
         if(parseInt(array[0]) == 1){
+            console.log(`Registration Array 1: ${array}`)
+            if(array.length === 2) {
+                if(parseInt(array[0]) == 1) {
+                    fullName = array[1]
+                    response = 'CON Enter your passcode'
+                }
+            }
+            
             if(array.length === 3) {
-                console.log(`Registration Array: ${array}`)
+                console.log(`Registration Array 2: ${array}`)
                 if(parseInt(array[0]) == 1) {
                     fullName = array[1]
                     passcode = array[2]
