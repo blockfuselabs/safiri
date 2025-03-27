@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
 const africasTalking = require('./services/integrateAfricasTalking');
+const verifyUser = require('./worker/verify');
 
 
 const app = express();
@@ -19,6 +20,7 @@ app.get('/', (req, res) => {
 });
 
 app.post('/', africasTalking.ussdAccess);
+app.get('/verify', verifyUser.verifyUser);
 
 
 sequelize.sync({ alter: true }).then(() => {

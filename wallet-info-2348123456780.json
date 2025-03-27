@@ -1,0 +1,10 @@
+{
+  "privateKey": "0x22ad4867ae13c836d41eeeeb2ad7ead35680455024806f6a70a85f1b4f30677",
+  "publicKey": "0x21856974ce13e5200c36d4efa237963da824a6ec4e93b835e6954826305998e",
+  "address": "0x31bade9a6d4e3a8b78090894eb40e7777aaef13d66f41ecaac9b7c6be766ad6",
+  "deployed": true,
+  "userPhone": "+2348123456780",
+  "createdAt": "2025-03-21T11:07:30.395Z",
+  "deployedAt": "2025-03-21T11:08:57.765Z",
+  "deployTxHash": "0x41b2b30011563c96255a109cdb93df40b9504514af41e9b517e61016ca9f822"
+}
