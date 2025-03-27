@@ -46,4 +46,62 @@ Safiri aims to **democratize blockchain access via USSD** while simplifying inte
 **Docker Compose (if not included with Docker)**<br>
 **Latest version of node**
 
+### 1. Clone the Repository and navigate to safiri dir
+```bash
+cd ~
+git clone https://github.com/blockfuselabs/safiri.git
+cd safiri
+```
+### 2.Start Up Docker
+```bash
+docker compose up
+```
+### 3. Install the Dependencies
+```bash
+npm install
+```
+### 4. Copy the Environment Variables File
+```bash
+cp .env.example .env
+```
+Edit the .env file as needed with your configurations.
+### 5. Install Dependencies and Start Up Docker
+```bash
+npm install
+
+docker compose up
+```
+### 5. Start the Project
+```bash
+npm run start
+```
+Now you're ready to start building with Safiri. Next is to Create an Account with Africa's Talking[create an account](https://account.africastalking.com/auth/login?next=%2F)
+
+
+### Africa's Talking APIs for USSD Integration
+Africa's Talking's APIs for USSD integration and interactions.
+We will be using Africa's Talking’s sandbox and emulator for test development.
+
+- Sandbox: For testing API interactions without affecting live data.
+
+- Emulator: Simulate USSD interactions to test how the system behaves before going live.
+
+### **Setup a sandbox**
+#### i. Create a Channel in Your Dashboard
+1. Go to your **Africa's Talking dashboard**.
+2. Navigate to the **USSD** section.
+3. Click on **Create Channel**.
+4. Provide your **channel number** and the **callback URL**.
+
+#### ii. Set Up Ngrok
+If you don’t have Ngrok installed, follow the official [installation documentation](https://ngrok.com/docs) or run the following command to install it:
+
+```bash
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+   | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+   && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+   | sudo tee /etc/apt/sources.list.d/ngrok.list \
+   && sudo apt update \
+   && sudo apt install ngrok
+   ```
 
