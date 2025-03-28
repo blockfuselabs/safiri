@@ -16,6 +16,7 @@ const {
     CairoCustomEnum
 } = require('starknet');
 const fs = require('fs');
+const { sendSMS, messages } = require('./smsService');
 
 const africaStalking = africaStalkingData({
     apiKey: process.env.AFRICA_STALKING_API_KEY || "",
@@ -318,12 +319,22 @@ exports.ussdAccess = async (req, res) => {
                         createAndDeployAccount(fullName, phoneNumber, passcode).then(async (result) => {
                             console.log("Account creation result:", result);
                 
-                            if (result.success){
+                            if (result.success) {
                                 try {
-                                    await africaStalking.SMS.send({
-                                        to: phoneNumber,
-                                        message: `Your Starknet wallet has been created. Your wallet address: ${result.address.substring(0, 8)}...${result.address.substring(result.address.length - 6)}`
-                                    });
+                                    await sendSMS(
+                                        phoneNumber, 
+                                        messages.accountCreated(result.address)
+                                    );
+                                } catch (smsError) {
+                                    console.error("SMS sending error", smsError);
+                                }
+                            } else {
+                                // Send failure notification
+                                try {
+                                    await sendSMS(
+                                        phoneNumber,
+                                        messages.accountDeploymentFailed()
+                                    );
                                 } catch (smsError) {
                                     console.error("SMS sending error", smsError);
                                 }
@@ -344,4 +355,44 @@ exports.ussdAccess = async (req, res) => {
     res.send(response);
 }
 
-module.exports = exports;
+// Add new function to handle transaction notifications
+async function sendTransactionNotification(phoneNumber, success, details) {
+    try {
+        const message = success 
+            ? messages.transactionSuccess(details.txHash, details.amount)
+            : messages.transactionFailed(details.error);
+            
+        await sendSMS(phoneNumber, message);
+    } catch (error) {
+        console.error('Failed to send transaction notification:', error);
+    }
+}
+
+// Example usage in a transaction function
+async function processTransaction(userPhone, amount, beneficiary) {
+    try {
+        // Your transaction logic here
+        const txResult = await performTransaction();
+        
+        // Send success notification
+        await sendTransactionNotification(userPhone, true, {
+            txHash: txResult.hash,
+            amount: amount
+        });
+        
+        return txResult;
+    } catch (error) {
+        // Send failure notification
+        await sendTransactionNotification(userPhone, false, {
+            error: error.message
+        });
+        
+        throw error;
+    }
+}
+
+module.exports = {
+    ussdAccess,
+    createAndDeployAccount,
+    sendTransactionNotification
+};
