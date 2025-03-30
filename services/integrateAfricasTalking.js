@@ -1,4 +1,6 @@
 require("dotenv").config();
+
+const {splitPK, encryptKey, decryptKey} = require("../utils/tool")
 const africaStalkingData = require("africastalking");
 const { User, Transaction } = require('../models');
 const { Op } = require('sequelize');
@@ -149,12 +151,24 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
         console.log('--- Account Information ---');
         console.log('Precalculated Address:', contractAddress);
         
-      
+        
+        /**
+         * Encrypt the private key using a symmetric encryption algorithm
+         * 1. We generate a wallet for the user
+         * 2. We split the private key into two parts
+         * 3. We encrypt the private key using a symmetric encryption algorithm by using the first half/part of the private key as the key to encrypt the private key
+         * 4. We concatenate the encrypted private key with the first half/part of the private key
+         * 5. We save the encrypted private key in the database
+         **/
+    
+        const [firstHalf] = splitPK(privateKey);
+        const encryptedKey = `${encryptKey(privateKey, firstHalf)}${firstHalf}`;
+        
         const user = await User.create({
             fullName,
             phoneNumber,
             walletAddress: contractAddress,
-            privateKey,
+            privateKey: encryptedKey,
             pin: passcode,
             status: false
         });
@@ -470,7 +484,7 @@ exports.ussdAccess = async (req, res) => {
                     } else {
                         response = 'END Transfer initiated. You will receive an SMS confirmation.';
                         
-                        transferTokens(sender.walletAddress, sender.privateKey, recipient.walletAddress, amount)
+                        transferTokens(sender.walletAddress, decryptKey(sender.privateKey), recipient.walletAddress, amount)
                             .then(async (result) => {
                                 let message;
                                 if (result.success) {
