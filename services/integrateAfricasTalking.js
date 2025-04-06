@@ -568,6 +568,7 @@ const ussdAccess = async (req, res) => {
                                     await sendSMS(phoneNumber, messages.transactionSuccess(result.txHash, amount, recipientAddress));
                                 } else {
                                     message = `Transfer failed: ${result.message}`;
+                                    sendSMS(phoneNumber, messages.transactionFailed(result.message));
                                 }
                                 
                                 console.log(result, message);
