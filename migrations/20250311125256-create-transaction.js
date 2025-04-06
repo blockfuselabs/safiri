@@ -1,6 +1,6 @@
 'use strict';
 
-const PaymentStatus = require('../enums/paymentStatus');
+// const PaymentStatus = require('../enums/paymentStatus');
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
