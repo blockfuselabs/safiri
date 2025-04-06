@@ -38,7 +38,7 @@ const ARGENT_X_ACCOUNT_CLASS_HASH = '0x036078334509b514626504edc9fb252328d1a240e
 
 const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
 const adminAccountAddress = process.env.ADMIN_ACCOUNT_ADDRESS;
-const INITIAL_FUNDING_AMOUNT = process.env.FUNDING_AMOUNT || '0.002';
+const INITIAL_FUNDING_AMOUNT = process.env.FUNDING_AMOUNT || '0.0001';
 
 const provider = new RpcProvider({ nodeUrl: NODE_URL });
 
@@ -249,7 +249,7 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
         const user = await User.create({
             fullName,
             phoneNumber,
-            safiriUsername,
+            safiriUsername: safiriUsername,
             walletAddress: contractAddress,
             privateKey: encryptedKey,
             pin: passcode,
@@ -268,9 +268,9 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
             createdAt: new Date().toISOString()
         };
         
-        const tempFilePath = `./wallet-info-${phoneNumber.replace(/[^0-9]/g, '')}.json`;
-        fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
-        console.log(`Wallet information saved to ${tempFilePath}`);
+        // const tempFilePath = `./wallet-info-${phoneNumber.replace(/[^0-9]/g, '')}.json`;
+        // fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
+        // console.log(`Wallet information saved to ${tempFilePath}`);
 
         console.log('--- Wallet Information ---');
         console.log('Private Key:', privateKey);
@@ -338,10 +338,10 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
             await user.save();
             
             
-            walletInfo.deployed = true;
-            walletInfo.deployedAt = new Date().toISOString();
-            walletInfo.deployTxHash = deployTxHash;
-            fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
+            // walletInfo.deployed = true;
+            // walletInfo.deployedAt = new Date().toISOString();
+            // walletInfo.deployTxHash = deployTxHash;
+            // fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
             
             return {
                 success: true,
@@ -366,7 +366,7 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
     }
 }
 
-exports.ussdAccess = async (req, res) => {
+const ussdAccess = async (req, res) => {
     const {sessionId, serviceCode, phoneNumber, text} = req.body;
 
     let response; 

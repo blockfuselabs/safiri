@@ -1,3 +1,5 @@
+const { User } = require('../models');
+
 //====generating safiri user logic start from here===//
 function sanitizeName(name) {
     return name
