@@ -20,7 +20,9 @@ const {
     CairoCustomEnum
 } = require('starknet');
 const fs = require('fs');
+const { v4: uuid } = require('uuid');
 const { sendSMS, messages } = require('./smsService');
+const generateSafiriUsername  = require('./usernameGeneration');
 
 const africaStalking = africaStalkingData({
     apiKey: process.env.AFRICA_STALKING_API_KEY || "",
@@ -241,10 +243,13 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
     
         const [firstHalf] = splitPK(privateKey);
         const encryptedKey = `${encryptKey(privateKey, firstHalf)}${firstHalf}`;
+
+        const safiriUsername = await generateSafiriUsername(fullName);
         
         const user = await User.create({
             fullName,
             phoneNumber,
+            safiriUsername,
             walletAddress: contractAddress,
             privateKey: encryptedKey,
             pin: passcode,
