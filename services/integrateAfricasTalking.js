@@ -20,6 +20,9 @@ const {
     CairoCustomEnum
 } = require('starknet');
 const fs = require('fs');
+const { v4: uuid } = require('uuid');
+const { sendSMS, messages } = require('./smsService');
+const generateSafiriUsername  = require('./usernameGeneration');
 
 const africaStalking = africaStalkingData({
     apiKey: process.env.AFRICA_STALKING_API_KEY || "",
@@ -35,7 +38,7 @@ const ARGENT_X_ACCOUNT_CLASS_HASH = '0x036078334509b514626504edc9fb252328d1a240e
 
 const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
 const adminAccountAddress = process.env.ADMIN_ACCOUNT_ADDRESS;
-const INITIAL_FUNDING_AMOUNT = process.env.FUNDING_AMOUNT || '0.002';
+const INITIAL_FUNDING_AMOUNT = process.env.FUNDING_AMOUNT || '0.0001';
 
 const provider = new RpcProvider({ nodeUrl: NODE_URL });
 
@@ -240,10 +243,13 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
     
         const [firstHalf] = splitPK(privateKey);
         const encryptedKey = `${encryptKey(privateKey, firstHalf)}${firstHalf}`;
+
+        const safiriUsername = await generateSafiriUsername(fullName);
         
         const user = await User.create({
             fullName,
             phoneNumber,
+            safiriUsername: safiriUsername,
             walletAddress: contractAddress,
             privateKey: encryptedKey,
             pin: passcode,
@@ -262,9 +268,9 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
             createdAt: new Date().toISOString()
         };
         
-        const tempFilePath = `./wallet-info-${phoneNumber.replace(/[^0-9]/g, '')}.json`;
-        fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
-        console.log(`Wallet information saved to ${tempFilePath}`);
+        // const tempFilePath = `./wallet-info-${phoneNumber.replace(/[^0-9]/g, '')}.json`;
+        // fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
+        // console.log(`Wallet information saved to ${tempFilePath}`);
 
         console.log('--- Wallet Information ---');
         console.log('Private Key:', privateKey);
@@ -332,10 +338,10 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
             await user.save();
             
             
-            walletInfo.deployed = true;
-            walletInfo.deployedAt = new Date().toISOString();
-            walletInfo.deployTxHash = deployTxHash;
-            fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
+            // walletInfo.deployed = true;
+            // walletInfo.deployedAt = new Date().toISOString();
+            // walletInfo.deployTxHash = deployTxHash;
+            // fs.writeFileSync(tempFilePath, JSON.stringify(walletInfo, null, 2));
             
             return {
                 success: true,
@@ -360,7 +366,7 @@ async function createAndDeployAccount(fullName, phoneNumber, passcode) {
     }
 }
 
-exports.ussdAccess = async (req, res) => {
+const ussdAccess = async (req, res) => {
     const {sessionId, serviceCode, phoneNumber, text} = req.body;
 
     let response; 
@@ -387,6 +393,7 @@ exports.ussdAccess = async (req, res) => {
                     response = 'END Your wallet is not yet active. Please wait for deployment.';
                 } else {
                     const balance = await checkBalance(provider, userExist.walletAddress);
+                    sendSMS(phoneNumber, messages.accountBalance(userExist.walletAddress, Number(balance) / 1e18));
                     response = `END Your wallet balance: ${Number(balance) / 1e18} STRK`;
                 }
             }
@@ -456,10 +463,7 @@ exports.ussdAccess = async (req, res) => {
                     
                                 if (result.success){
                                     try {
-                                        await africaStalking.SMS.send({
-                                            to: phoneNumber,
-                                            message: `Your Starknet wallet has been created. Your wallet address: ${result.address.substring(0, 8)}...${result.address.substring(result.address.length - 6)}`
-                                        });
+                                        await sendSMS(phoneNumber, messages.accountCreated(result.address))
                                     } catch (smsError) {
                                         console.error("SMS sending error", smsError);
                                     }
@@ -560,8 +564,11 @@ exports.ussdAccess = async (req, res) => {
                                         date: new Date()
                                     });
                                     message = `Transfer of ${amount} STRK to ${recipient.safiriUsername || recipient.phoneNumber} completed successfully.`;
+                                    const recipientAddress = recipient.safiriUsername;
+                                    await sendSMS(phoneNumber, messages.transactionSuccess(result.txHash, amount, recipientAddress));
                                 } else {
                                     message = `Transfer failed: ${result.message}`;
+                                    sendSMS(phoneNumber, messages.transactionFailed(result.message));
                                 }
                                 
                                 console.log(result, message);
@@ -592,4 +599,44 @@ exports.ussdAccess = async (req, res) => {
     res.send(response);
 }
 
-module.exports = exports;
+// Add new function to handle transaction notifications
+async function sendTransactionNotification(phoneNumber, success, details) {
+    try {
+        const message = success 
+            ? messages.transactionSuccess(details.txHash, details.amount)
+            : messages.transactionFailed(details.error);
+            
+        await sendSMS(phoneNumber, message);
+    } catch (error) {
+        console.error('Failed to send transaction notification:', error);
+    }
+}
+
+// Example usage in a transaction function
+async function processTransaction(userPhone, amount, beneficiary) {
+    try {
+        // Your transaction logic here
+        const txResult = await performTransaction();
+        
+        // Send success notification
+        await sendTransactionNotification(userPhone, true, {
+            txHash: txResult.hash,
+            amount: amount
+        });
+        
+        return txResult;
+    } catch (error) {
+        // Send failure notification
+        await sendTransactionNotification(userPhone, false, {
+            error: error.message
+        });
+        
+        throw error;
+    }
+}
+
+module.exports = {
+    ussdAccess,
+    createAndDeployAccount,
+    sendTransactionNotification
+};

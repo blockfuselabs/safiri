@@ -20,7 +20,6 @@ app.get('/', (req, res) => {
 });
 
 app.post('/', africasTalking.ussdAccess);
-app.get('/verify', verifyUser.verifyUser);
 
 
 sequelize.sync({ alter: true }).then(() => {
