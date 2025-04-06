@@ -10,7 +10,8 @@ async function sendSMS(phoneNumber, message) {
     try {
         const result = await africaStalking.SMS.send({
             to: phoneNumber,
-            message: message
+            message: message,
+            from: `28364`
         });
         console.log('SMS sent successfully:', result);
         return result;
@@ -28,11 +29,13 @@ const messages = {
     accountDeploymentFailed: () =>
         `Your wallet creation encountered an issue. Our team will look into it and get back to you.`,
     
-    transactionSuccess: (txHash, amount) =>
-        `Transaction successful! Amount: ${amount} STRK. Hash: ${txHash.substring(0, 8)}...`,
+    transactionSuccess: (txHash, amount, recipient) =>
+        `Transaction successful! Amount: ${amount} STRK. Hash: ${txHash.substring(0, 8)}...\n Recipient: ${recipient}`,
     
     transactionFailed: (error) =>
-        `Transaction failed. Error: ${error}. Please try again later.`
+        `Transaction failed. Error: ${error}. Please try again later.`,
+    accountBalance: (address, balance) =>
+        `Your account ${address} \n has a balance of ${balance} starks.`,
 };
 
 module.exports = {

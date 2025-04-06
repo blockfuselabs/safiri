@@ -393,6 +393,7 @@ const ussdAccess = async (req, res) => {
                     response = 'END Your wallet is not yet active. Please wait for deployment.';
                 } else {
                     const balance = await checkBalance(provider, userExist.walletAddress);
+                    sendSMS(phoneNumber, messages.accountBalance(userExist.walletAddress, Number(balance) / 1e18));
                     response = `END Your wallet balance: ${Number(balance) / 1e18} STRK`;
                 }
             }
@@ -462,10 +463,7 @@ const ussdAccess = async (req, res) => {
                     
                                 if (result.success){
                                     try {
-                                        await africaStalking.SMS.send({
-                                            to: phoneNumber,
-                                            message: `Your Starknet wallet has been created. Your wallet address: ${result.address.substring(0, 8)}...${result.address.substring(result.address.length - 6)}`
-                                        });
+                                        await sendSMS(phoneNumber, messages.accountCreated(result.address))
                                     } catch (smsError) {
                                         console.error("SMS sending error", smsError);
                                     }
@@ -566,6 +564,8 @@ const ussdAccess = async (req, res) => {
                                         date: new Date()
                                     });
                                     message = `Transfer of ${amount} STRK to ${recipient.safiriUsername || recipient.phoneNumber} completed successfully.`;
+                                    const recipientAddress = recipient.safiriUsername;
+                                    await sendSMS(phoneNumber, messages.transactionSuccess(result.txHash, amount, recipientAddress));
                                 } else {
                                     message = `Transfer failed: ${result.message}`;
                                 }
